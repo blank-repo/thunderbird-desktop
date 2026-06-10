@@ -1,4 +1,3 @@
-/* -*- Mode: JavaScript; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -30,7 +29,7 @@ export var MailMigrator = {
   _migrateUI() {
     // The code for this was ported from
     // mozilla/browser/components/nsBrowserGlue.js
-    const UI_VERSION = 57;
+    const UI_VERSION = 60;
     const UI_VERSION_PREF = "mail.ui-rdf.version";
     let currentUIVersion = Services.prefs.getIntPref(UI_VERSION_PREF, 0);
 
@@ -411,6 +410,51 @@ export var MailMigrator = {
         updateValue(
           "chrome://openpgp/content/ui/enigmailKeyManager.xhtml",
           "showOthersKeys"
+        );
+      }
+
+      if (currentUIVersion < 58) {
+        // We've already migrated Yahoo/AOL/AT&T accounts to use PKCE
+        // where applicable in OAuth2Module.sys.mjs. We can now remove the
+        // pref that indicates whether such a user was detected.
+        Services.prefs.clearUserPref(
+          "mail.inappnotifications.pkceUpgradeForYahooAol"
+        );
+      }
+
+      if (currentUIVersion < 59) {
+        for (const identity of MailServices.accounts.allIdentities) {
+          identity.attachPgpKey = false;
+        }
+      }
+
+      if (currentUIVersion < 60) {
+        function updateCheckedValue(url, id) {
+          if (Services.xulStore.hasValue(url, id, "checked")) {
+            const oldValue = Services.xulStore.getValue(url, id, "checked");
+            Services.xulStore.setValue(
+              url,
+              id,
+              "checked",
+              oldValue == "false" ? "-moz-missing\n" : ""
+            );
+          }
+        }
+        updateCheckedValue(
+          "chrome://messenger/content/messenger.xhtml",
+          "calendar_toggle_orientation_command"
+        );
+        updateCheckedValue(
+          "chrome://messenger/content/messenger.xhtml",
+          "calendar_toggle_workdays_only_command"
+        );
+        updateCheckedValue(
+          "chrome://messenger/content/messenger.xhtml",
+          "calendar_toggle_tasks_in_view_command"
+        );
+        updateCheckedValue(
+          "chrome://messenger/content/messenger.xhtml",
+          "calendar_toggle_show_completed_in_view_command"
         );
       }
 

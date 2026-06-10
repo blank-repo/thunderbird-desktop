@@ -1,4 +1,3 @@
-/* -*- Mode: C++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -481,23 +480,25 @@ nsString EncodeFilename(nsACString const& str);
  */
 nsCString DecodeFilename(nsAString const& filename);
 
-// Parse Message-Ids from a space-separated list (or single Message-Id).
-// As per section 3.6.4 of RFC 5322.
-// i.e. Parse "Message-Id", "In-Reply-To:" and "References:" headers.
-//
-// Examples:
-// "" -> []
-// "<test@example.com>" -> ["test@example.com"]
-// "<foo23@example.com> <bar99@blah.org>"
-//   -> ["foo23@example.com", bar99@blah.org"]
-// "\t\t\t   <foo23@example.com>    <bar99@blah.org> \t\t "
-//    -> ["foo23@example.com", bar99@blah.org"]
-// "foo bar" -> ["foo","bar"]
-//
-// Some currently-undefined corner-cases...
-// "<<<foo bar" -> ["<<foo","bar"]?
-// "<foo bar>" -> ???
-// etc...
+/**
+ * Parse Message-Ids from a space-separated list (or single Message-Id).
+ * As per section 3.6.4 of RFC 5322.
+ * i.e. Parse "Message-Id", "In-Reply-To:" and "References:" headers.
+ *
+ * Examples:
+ * "" => {}
+ * "<test@example.com>" => {"test@example.com"}
+ * "<foo23@example.com> <bar99@blah.org>"
+ *   => ["foo23@example.com", bar99@blah.org"}
+ * "\t\t\t   <foo23@example.com>    <bar99@blah.org> \t\t "
+ *    => {"foo23@example.com", bar99@blah.org"}
+ * "foo bar" => {"foo","bar"}
+ *
+ * Some currently-undefined corner-cases...
+ * "<<<foo bar" => {"<<foo","bar"}?
+ * "<foo bar>" => ???
+ * etc...
+ */
 nsTArray<nsCString> ParseIdentificationFields(nsACString const& m);
 
 /**
@@ -512,5 +513,19 @@ nsresult LocalizeMessage(mozilla::intl::Localization* l10n,
                          nsACString const& id,
                          nsTArray<std::pair<nsCString, nsCString>> const& args,
                          nsACString& message);
+
+/**
+ * StringFields() splits a string into fields separated by runs of consecutive
+ * ASCII white space characters. It returns a list of substrings, none of
+ * which will be empty.
+ * Leading and trailing whitespace will be discarded. If the string is empty
+ * or contains only whitespace, an empty array will be returned.
+ *
+ * Examples:
+ * "" => {}
+ * " foo bar " => {"foo", "bar"}
+ * "  foo\r\n  bar" => {"foo", "bar"}
+ */
+nsTArray<nsCString> StringFields(nsACString const& s);
 
 #endif  // COMM_MAILNEWS_BASE_SRC_NSMSGUTILS_H_

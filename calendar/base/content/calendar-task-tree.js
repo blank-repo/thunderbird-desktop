@@ -46,7 +46,7 @@
     }
 
     onAddItem(item) {
-      if (!this.tree.hasBeenVisible) {
+      if (!this.tree.isInitialized) {
         return;
       }
 
@@ -56,7 +56,7 @@
     }
 
     onModifyItem(newItem, oldItem) {
-      if (!this.tree.hasBeenVisible) {
+      if (!this.tree.isInitialized) {
         return;
       }
 
@@ -71,7 +71,7 @@
     }
 
     onDeleteItem(deletedItem) {
-      if (!this.tree.hasBeenVisible) {
+      if (!this.tree.isInitialized) {
         return;
       }
 
@@ -122,6 +122,13 @@
    * @augments {MozTree}
    */
   class CalendarTaskTree extends customElements.get("tree") {
+    /**
+     * Whether the view has been initialized.
+     *
+     * @type {boolean}
+     */
+    #isInitialized = false;
+
     connectedCallback() {
       super.connectedCallback();
       if (this.delayConnectedCallback() || this.hasConnected) {
@@ -135,7 +142,7 @@
             <treecol is="treecol-image" id="calendar-task-tree-col-completed"
                      class="calendar-task-tree-col-completed"
                      style="min-width: 18px"
-                     fixed="true"
+                     fixed="fixed"
                      cycler="true"
                      sortKey="completedDate"
                      itemproperty="completed"
@@ -146,7 +153,7 @@
             <treecol is="treecol-image" id="calendar-task-tree-col-priority"
                      class="calendar-task-tree-col-priority"
                      style="min-width: 17px"
-                     fixed="true"
+                     fixed="fixed"
                      itemproperty="priority"
                      closemenu="none"
                      src="chrome://messenger/skin/icons/new/compact/priority.svg"
@@ -169,6 +176,18 @@
                      style="flex: 1 auto"
                      closemenu="none"
                      data-l10n-id="calendar-event-listing-column-due-date"/>
+            <splitter class="tree-splitter"/>
+            <treecol class="calendar-task-tree-col-creationdate"
+                     itemproperty="creationDate"
+                     style="flex: 1 auto"
+                     closemenu="none"
+                     data-l10n-id="calendar-event-listing-column-creation-date"/>
+            <splitter class="tree-splitter"/>
+            <treecol class="calendar-task-tree-col-lastmodifiedtime"
+                     itemproperty="lastModifiedTime"
+                     style="flex: 1 auto"
+                     closemenu="none"
+                     data-l10n-id="calendar-event-listing-column-last-modified-time"/>
             <splitter class="tree-splitter"/>
             <treecol class="calendar-task-tree-col-duration"
                      itemproperty="duration"
@@ -289,6 +308,27 @@
       this.restoreColumnState();
 
       window.addEventListener("unload", this.persistColumnState.bind(this));
+    }
+
+    /**
+     * Ensure the tree has been initialized.
+     */
+    ensureInitialized() {
+      if (!this.#isInitialized) {
+        this.#isInitialized = true;
+        Glean.calendar.viewInitialized[this.id].add(1);
+        this.refresh();
+      }
+    }
+
+    /**
+     * Whether the view has been initialized.
+     *
+     * @returns {boolean} - True if the view has been initialized, otherwise
+     * false.
+     */
+    get isInitialized() {
+      return this.#isInitialized;
     }
 
     get currentTask() {
@@ -470,7 +510,7 @@
     }
 
     refreshFromCalendar(calendar) {
-      if (!this.hasBeenVisible) {
+      if (!this.#isInitialized) {
         return;
       }
 

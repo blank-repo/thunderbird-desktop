@@ -87,6 +87,28 @@ impl LinuxSysTrayHandler {
             log::error!("translation issues: {errors:?}");
         }
 
+        // Grab the hide message
+        let msg = bundle
+            .get_message("system-tray-menu-hide")
+            .expect("Message doesn't exist.");
+        let mut errors = vec![];
+        let label = msg.get_attribute("label").expect("Message doesn't exist.");
+        let hide_msg = bundle.format_pattern(label.value(), None, &mut errors);
+        if !errors.is_empty() {
+            log::error!("translation issues: {errors:?}");
+        }
+
+        // Grab the show message
+        let msg = bundle
+            .get_message("system-tray-menu-show")
+            .expect("Message doesn't exist.");
+        let mut errors = vec![];
+        let label = msg.get_attribute("label").expect("Message doesn't exist.");
+        let show_msg = bundle.format_pattern(label.value(), None, &mut errors);
+        if !errors.is_empty() {
+            log::error!("translation issues: {errors:?}");
+        }
+
         // Determine correct image
         let icon = if XdgIcon::requires_symbolic() {
             system_tray::locate_icon_on_system("TB-symbolic.svg").map(XdgIcon::Path)
@@ -97,13 +119,29 @@ impl LinuxSysTrayHandler {
         .unwrap_or_else(|| XdgIcon::for_desktop("thunderbird"));
 
         // Build our menu structure
-        let menus = [TrayItem::ActionItem {
-            label: quit_msg.into(),
-            icon: None,
-            action: Action::Quit,
-            enabled: true,
-            visible: true,
-        }];
+        let menus = [
+            TrayItem::ActionItem {
+                label: show_msg.into(),
+                icon: None,
+                action: Action::Show,
+                enabled: true,
+                visible: true,
+            },
+            TrayItem::ActionItem {
+                label: hide_msg.into(),
+                icon: None,
+                action: Action::Hide,
+                enabled: true,
+                visible: true,
+            },
+            TrayItem::ActionItem {
+                label: quit_msg.into(),
+                icon: None,
+                action: Action::Quit,
+                enabled: true,
+                visible: true,
+            },
+        ];
 
         // Get it executed
         let tray = SystemTray::new("Thunderbird", icon, "Thunderbird Daily").with_items(menus);

@@ -83,6 +83,20 @@ menu-quit =
 menu-quit-mac =
     .label = Quit { -brand-shorter-name }
 
+system-tray-menu-show =
+    .label =
+        { PLATFORM() ->
+            [windows] Exit { -brand-full-name }
+           *[other] Show { -brand-full-name }
+        }
+
+system-tray-menu-hide =
+    .label =
+        { PLATFORM() ->
+            [windows] Exit { -brand-full-name }
+           *[other] Hide { -brand-full-name }
+        }
+
 system-tray-menu-quit =
     .label =
         { PLATFORM() ->

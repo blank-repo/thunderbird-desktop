@@ -1,4 +1,3 @@
-/* -*- Mode: C++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -34,11 +33,11 @@ extern nsresult nsBuildImapMessageURI(const char* baseURI, nsMsgKey key,
 extern nsresult nsCreateImapBaseMessageURI(const nsACString& baseURI,
                                            nsCString& baseMessageURI);
 
-void AllocateImapUidString(const uint32_t* msgUids, uint32_t& msgCount,
+void AllocateImapUidString(const ImapUid* msgUids, uint32_t& msgCount,
                            nsImapFlagAndUidState* flagState,
                            nsCString& returnString);
-void ParseUidString(const char* uidString, nsTArray<nsMsgKey>& keys);
-void AppendUid(nsCString& msgIds, uint32_t uid);
+void ParseUidString(const char* uidString, nsTArray<ImapUid>& uids);
+void AppendUid(nsCString& msgIds, ImapUid uid);
 
 class nsImapMailboxSpec : public nsIMailboxSpec {
  public:
@@ -54,12 +53,12 @@ class nsImapMailboxSpec : public nsIMailboxSpec {
 
   uint32_t mBoxFlags;
   uint32_t mSupportedUserFlags;
-  int32_t mFolder_UIDVALIDITY;
+  ImapUid mFolder_UIDVALIDITY;
   uint64_t mHighestModSeq;
   int32_t mNumOfMessages;
   int32_t mNumOfUnseenMessages;
   int32_t mNumOfRecentMessages;
-  int32_t mNextUID;
+  ImapUid mNextUID;
   nsCString mAllocatedPathName;
   nsCString mHostName;
   nsString mUnicharPathName;

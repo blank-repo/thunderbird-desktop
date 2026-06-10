@@ -1,4 +1,3 @@
-/* -*- Mode: C++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -6,7 +5,7 @@
 #include "msgCore.h"
 #include "nsMsgMailNewsUrl.h"
 #include "nsIMsgAccountManager.h"
-#include "nsIMsgStatusFeedback.h"
+#include "nsIFeedbackService.h"
 #include "nsIMsgWindow.h"
 #include "nsString.h"
 #include "nsILoadGroup.h"
@@ -87,6 +86,8 @@ NS_INTERFACE_MAP_BEGIN(nsMsgMailNewsUrl)
   NS_INTERFACE_MAP_ENTRY(nsIURL)
   NS_INTERFACE_MAP_ENTRY(nsIURI)
   NS_INTERFACE_MAP_ENTRY(nsISerializable)
+  NS_INTERFACE_MAP_ENTRY(nsIIPCSerializableURI)
+  NS_INTERFACE_MAP_ENTRY(nsIURIWithSizeOf)
   NS_INTERFACE_MAP_ENTRY(nsIClassInfo)
   NS_INTERFACE_MAP_ENTRY_CONDITIONAL(nsIURIWithSpecialOrigin,
                                      m_hasNormalizedOrigin)
@@ -100,9 +101,9 @@ NS_INTERFACE_MAP_END
 // cause problems in the future. See bug 1512356 and bug 1515337 for details,
 // follow-up in bug 1512698.
 
-NS_IMETHODIMP_(void)
-nsMsgMailNewsUrl::Serialize(mozilla::ipc::URIParams& aParams) {
-  m_baseURL->Serialize(aParams);
+void nsMsgMailNewsUrl::Serialize(mozilla::ipc::URIParams& aParams) {
+  nsCOMPtr<nsIIPCSerializableURI> serializable = do_QueryInterface(m_baseURL);
+  serializable->Serialize(aParams);
 }
 
 //----------------------------
@@ -214,16 +215,16 @@ nsresult nsMsgMailNewsUrl::SetUrlState(bool aRunningUrl, nsresult aExitCode) {
     return NS_OK;
   }
   m_runningUrl = aRunningUrl;
-  nsCOMPtr<nsIMsgStatusFeedback> statusFeedback;
 
-  // put this back - we need it for urls that don't run through the doc loader
-  if (NS_SUCCEEDED(GetStatusFeedback(getter_AddRefs(statusFeedback))) &&
-      statusFeedback) {
-    if (m_runningUrl)
-      statusFeedback->StartMeteors();
-    else {
-      statusFeedback->ShowProgress(0);
-      statusFeedback->StopMeteors();
+  // We need it for urls that don't run through the doc loader.
+  nsCOMPtr<nsIFeedbackService> feedback =
+      mozilla::components::Feedback::Service();
+  if (feedback) {
+    if (m_runningUrl) {
+      feedback->ReportStatus(""_ns, "start-meteors"_ns);
+    } else {
+      feedback->ReportProgress(0);
+      feedback->ReportStatus(""_ns, "stop-meteors"_ns);
     }
   }
 
@@ -314,28 +315,6 @@ NS_IMETHODIMP nsMsgMailNewsUrl::SetMsgWindow(nsIMsgWindow* aMsgWindow) {
   return NS_OK;
 }
 
-NS_IMETHODIMP nsMsgMailNewsUrl::GetStatusFeedback(
-    nsIMsgStatusFeedback** aMsgFeedback) {
-  // note: it is okay to return a null status feedback and not return an error
-  // it's possible the url really doesn't have status feedback
-  *aMsgFeedback = nullptr;
-  if (!m_statusFeedbackWeak) {
-    nsCOMPtr<nsIMsgWindow> msgWindow(do_QueryReferent(m_msgWindowWeak));
-    if (msgWindow) msgWindow->GetStatusFeedback(aMsgFeedback);
-  } else {
-    nsCOMPtr<nsIMsgStatusFeedback> statusFeedback(
-        do_QueryReferent(m_statusFeedbackWeak));
-    statusFeedback.forget(aMsgFeedback);
-  }
-  return *aMsgFeedback ? NS_OK : NS_ERROR_NULL_POINTER;
-}
-
-NS_IMETHODIMP nsMsgMailNewsUrl::SetStatusFeedback(
-    nsIMsgStatusFeedback* aMsgFeedback) {
-  if (aMsgFeedback) m_statusFeedbackWeak = do_GetWeakReference(aMsgFeedback);
-  return NS_OK;
-}
-
 NS_IMETHODIMP nsMsgMailNewsUrl::GetMaxProgress(int64_t* aMaxProgress) {
   *aMaxProgress = mMaxProgress;
   return NS_OK;
@@ -348,22 +327,7 @@ NS_IMETHODIMP nsMsgMailNewsUrl::SetMaxProgress(int64_t aMaxProgress) {
 
 NS_IMETHODIMP nsMsgMailNewsUrl::GetLoadGroup(nsILoadGroup** aLoadGroup) {
   *aLoadGroup = nullptr;
-  // note: it is okay to return a null load group and not return an error
-  // it's possible the url really doesn't have load group
-  nsCOMPtr<nsILoadGroup> loadGroup(do_QueryReferent(m_loadGroupWeak));
-  if (!loadGroup) {
-    nsCOMPtr<nsIMsgWindow> msgWindow(do_QueryReferent(m_msgWindowWeak));
-    if (msgWindow) {
-      // XXXbz This is really weird... why are we getting some
-      // random loadgroup we're not really a part of?
-      nsCOMPtr<nsIDocShell> docShell;
-      msgWindow->GetRootDocShell(getter_AddRefs(docShell));
-      loadGroup = do_GetInterface(docShell);
-      m_loadGroupWeak = do_GetWeakReference(loadGroup);
-    }
-  }
-  loadGroup.forget(aLoadGroup);
-  return *aLoadGroup ? NS_OK : NS_ERROR_NULL_POINTER;
+  return NS_ERROR_NULL_POINTER;
 }
 
 NS_IMETHODIMP nsMsgMailNewsUrl::GetUpdatingFolder(bool* aResult) {

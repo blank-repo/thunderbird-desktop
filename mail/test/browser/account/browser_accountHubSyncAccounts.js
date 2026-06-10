@@ -171,7 +171,10 @@ add_task(async function test_skip_sync_accounts_load() {
 
   await subtest_clear_status_bar();
   MailServices.accounts.removeAccount(imapAccount);
-  Services.logins.removeAllLogins();
+  MailServices.outgoingServer.deleteServer(
+    MailServices.outgoingServer.servers.find(s => s.key != "smtp1")
+  );
+  await Services.logins.removeAllLoginsAsync();
 
   IMAPServer.close();
   SMTPServer.close();
@@ -459,7 +462,10 @@ add_task(async function test_account_load_sync_accounts_imap_account() {
 
   await subtest_clear_status_bar();
   MailServices.accounts.removeAccount(imapAccount);
-  Services.logins.removeAllLogins();
+  MailServices.outgoingServer.deleteServer(
+    MailServices.outgoingServer.servers.find(s => s.key != "smtp1")
+  );
+  await Services.logins.removeAllLoginsAsync();
 
   IMAPServer.close();
   SMTPServer.close();

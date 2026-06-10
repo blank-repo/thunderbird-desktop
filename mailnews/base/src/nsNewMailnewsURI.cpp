@@ -1,4 +1,3 @@
-/* -*- Mode: C++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -126,7 +125,8 @@ nsresult NS_NewMailnewsURI(nsIURI** aURI, const nsACString& aSpec,
         .SetSpec(aSpec)
         .Finalize(aURI);
   }
-  if (scheme.EqualsLiteral("ews") || scheme.EqualsLiteral("ews-message")) {
+  if (scheme.EqualsLiteral("ews") || scheme.EqualsLiteral("ews-message") ||
+      scheme.EqualsLiteral("graph") || scheme.EqualsLiteral("graph-message")) {
     return NS_MutateURI(new mozilla::net::nsStandardURL::Mutator())
         .SetSpec(aSpec)
         .Finalize(aURI);

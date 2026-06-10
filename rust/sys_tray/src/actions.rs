@@ -8,6 +8,8 @@ use cstr::cstr;
 use nserror::nsresult;
 use xpcom::get_service;
 use xpcom::interfaces::nsIAppStartup;
+use xpcom::interfaces::{nsIObserverService};
+use xpcom::{RefPtr, components};
 
 /// Actions from the tray menu
 /// Note: For thread safety we *must* safely support Copy!
@@ -15,6 +17,10 @@ use xpcom::interfaces::nsIAppStartup;
 pub enum Action {
     /// Quit menu has been pressed
     Quit,
+    /// Hide menu has been pressed
+    Hide,
+    /// Show menu has been pressed
+    Show,
 }
 
 /// Handle the given action in the tray menu
@@ -25,6 +31,9 @@ pub enum Action {
 pub(crate) fn handle_action(action: Action) -> Result<(), nsresult> {
     match &action {
         Action::Quit => request_quit(),
+        Action::Hide => request_hide(),
+        Action::Show => request_show(),
+//32 ~         &actions::Action::Hide | &actions::Action::Show => todo!(),
     }
 }
 
@@ -32,12 +41,51 @@ pub(crate) fn handle_action(action: Action) -> Result<(), nsresult> {
 ///
 /// This can only be called on the main thread.
 fn request_quit() -> Result<(), nsresult> {
+    log::error!("request_quit");
     let mut _cancelled = false;
     let service = get_service::<nsIAppStartup>(cstr!("@mozilla.org/toolkit/app-startup;1"))
         .ok_or(nserror::NS_ERROR_NO_INTERFACE)?;
     unsafe {
         service
             .Quit(nsIAppStartup::eAttemptQuit, 0, &mut _cancelled as *mut bool)
+            .to_result()?;
+    }
+    Ok(())
+}
+
+/// Request the application hide
+///
+/// This can only be called on the main thread.
+fn request_hide() -> Result<(), nsresult> {
+    log::error!("request_hide");
+    let obs_svc: RefPtr<nsIObserverService> = components::Observer::service()?;
+
+    unsafe {
+        obs_svc
+            .NotifyObservers(
+                std::ptr::null(),
+                c"system-tray-menu-hide".as_ptr(),
+                std::ptr::null(),
+            )
+            .to_result()?;
+    }
+    Ok(())
+}
+
+/// Request the application show
+///
+/// This can only be called on the main thread.
+fn request_show() -> Result<(), nsresult> {
+    log::error!("request_show");
+    let obs_svc: RefPtr<nsIObserverService> = components::Observer::service()?;
+
+    unsafe {
+        obs_svc
+            .NotifyObservers(
+                std::ptr::null(),
+                c"system-tray-menu-show".as_ptr(),
+                std::ptr::null(),
+            )
             .to_result()?;
     }
     Ok(())

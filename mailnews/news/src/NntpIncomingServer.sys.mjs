@@ -21,7 +21,6 @@ ChromeUtils.defineESModuleGetters(lazy, {
  * @implements {nsIMsgIncomingServer}
  * @implements {nsISupportsWeakReference}
  * @implements {nsISubscribableServer}
- * @implements {nsITreeView}
  * @implements {nsIUrlListener}
  */
 export class NntpIncomingServer extends MsgIncomingServer {
@@ -30,7 +29,6 @@ export class NntpIncomingServer extends MsgIncomingServer {
     "nsIMsgIncomingServer",
     "nsISupportsWeakReference",
     "nsISubscribableServer",
-    "nsITreeView",
     "nsIUrlListener",
   ]);
 
@@ -67,9 +65,6 @@ export class NntpIncomingServer extends MsgIncomingServer {
     Object.defineProperty(this, "canFileMessagesOnServer", {
       get: () => false,
     });
-
-    // nsISubscribableServer attributes.
-    this.supportsSubscribeSearch = true;
 
     // nsINntpIncomingServer attributes.
     this.newsrcHasChanged = false;
@@ -130,6 +125,11 @@ export class NntpIncomingServer extends MsgIncomingServer {
     this._subscribableServer = null;
   }
 
+  /**
+   * @param {nsIMsgWindow} msgWindow
+   * @param {boolean} forceToServer
+   * @param {boolean} getOnlyNew
+   */
   startPopulating(msgWindow, forceToServer, getOnlyNew) {
     this._startPopulating(msgWindow, forceToServer, getOnlyNew);
   }
@@ -156,8 +156,8 @@ export class NntpIncomingServer extends MsgIncomingServer {
       );
       this._groups.push(name);
     } catch (e) {
-      // Group names with double dot, like alt.binaries.sounds..mp3.zappa are
-      // not working. Bug 1788572.
+      // Groups names with double dots do not conform to RFC 5536 - 3.1.4.
+      // and are not supported
       console.error(`Failed to add group ${name}`, e);
     }
   }
@@ -218,23 +218,6 @@ export class NntpIncomingServer extends MsgIncomingServer {
     return this._subscribable.isSubscribable(path);
   }
 
-  setSearchValue(value) {
-    this._tree?.beginUpdateBatch();
-    this._tree?.rowCountChanged(0, -this._searchResult.length);
-
-    const terms = value.toLowerCase().split(" ");
-    this._searchResult = this._groups
-      .filter(name => {
-        name = name.toLowerCase();
-        // The group name should contain all the search terms.
-        return terms.every(term => name.includes(term));
-      })
-      .sort();
-
-    this._tree?.rowCountChanged(0, this._searchResult.length);
-    this._tree?.endUpdateBatch();
-  }
-
   getLeafName(path) {
     return this._subscribable.getLeafName(path);
   }
@@ -247,55 +230,22 @@ export class NntpIncomingServer extends MsgIncomingServer {
     return this._subscribable.getChildURIs(path);
   }
 
-  /** @see nsITreeView */
-  get rowCount() {
-    return this._searchResult.length;
-  }
+  /**
+   * @param {nsIURI} _url
+   * @see {nsIUrlListener}
+   */
+  OnStartRunningUrl(_url) {}
 
-  isContainer() {
-    return false;
-  }
-
-  getCellProperties(row, col) {
-    if (
-      col.id == "subscribedColumn2" &&
-      this._tmpSubscribed.has(this._searchResult[row])
-    ) {
-      return "subscribed-true";
-    }
-    if (col.id == "nameColumn2") {
-      // Show the news folder icon in the search view.
-      return "serverType-nntp";
-    }
-    return "";
-  }
-
-  getCellValue(row, col) {
-    if (col.id == "nameColumn2") {
-      return this._searchResult[row];
-    }
-    return "";
-  }
-
-  getCellText(row, col) {
-    if (col.id == "nameColumn2") {
-      return this._searchResult[row];
-    }
-    return "";
-  }
-
-  setTree(tree) {
-    this._tree = tree;
-  }
-
-  /** @see nsIUrlListener */
-  OnStartRunningUrl() {}
-
-  OnStopRunningUrl() {
+  /**
+   * @param {nsIURI} _url
+   * @param {nsresult} _exitCode
+   * @see {nsIUrlListener}
+   */
+  OnStopRunningUrl(_url, _exitCode) {
     this.stopPopulating(this._msgWindow);
   }
 
-  /** @see nsIMsgIncomingServer */
+  /** @see {nsIMsgIncomingServer} */
   get serverRequiresPasswordForBiff() {
     return false;
   }
@@ -486,13 +436,43 @@ export class NntpIncomingServer extends MsgIncomingServer {
   forgetPassword() {
     const newsFolder = this.rootFolder.QueryInterface(Ci.nsIMsgNewsFolder);
     // Clear password of root folder.
-    newsFolder.forgetAuthenticationCredentials();
+    let finished = false;
+    this.#forgetPasswordForFolder(newsFolder).finally(() => (finished = true));
+    Services.tm.spinEventLoopUntilOrQuit(
+      "NntpIncomingServer.forgetPassword 1",
+      () => finished
+    );
 
     // Clear password of all sub folders.
     for (const folder of newsFolder.subFolders) {
       folder.QueryInterface(Ci.nsIMsgNewsFolder);
-      folder.forgetAuthenticationCredentials();
+      finished = false;
+      this.#forgetPasswordForFolder(folder).finally(() => (finished = true));
+      Services.tm.spinEventLoopUntilOrQuit(
+        "NntpIncomingServer.forgetPassword 2",
+        () => finished
+      );
     }
+  }
+
+  /**
+   * @param {nsIMsgNewsFolder} folder
+   */
+  async #forgetPasswordForFolder(folder) {
+    const signonUrl = folder.urlForSignon;
+
+    // There should only be one login stored for this url, however just in case
+    // there isn't.
+    for (const login of await Services.logins.searchLoginsAsync({
+      origin: signonUrl,
+      httpRealm: signonUrl,
+    })) {
+      await Services.logins.removeLoginAsync(login);
+    }
+
+    // Clear out the saved passwords for anyone else who tries to call.
+    folder.groupUsername = "";
+    folder.groupPassword = "";
   }
 
   _lineSeparator = AppConstants.platform == "win" ? "\r\n" : "\n";

@@ -7,9 +7,11 @@
 const { nsMailServer } = ChromeUtils.importESModule(
   "resource://testing-common/mailnews/Maild.sys.mjs"
 );
-
 const { MailServices } = ChromeUtils.importESModule(
   "resource:///modules/MailServices.sys.mjs"
+);
+const { removeServersAndAccounts } = ChromeUtils.importESModule(
+  "resource://testing-common/mail/CleanupHelpers.sys.mjs"
 );
 
 const account_hub_start_templates = {
@@ -330,7 +332,7 @@ async function subtest_clear_status_bar() {
       clearTimeout(status._stopTimeoutID);
       status._stopTimeoutID = null;
     }
-    status._stopMeteors();
+    MailServices.feedback.reportStatus("", "stop-meteors");
   }
 
   Assert.ok(
@@ -344,7 +346,7 @@ async function subtest_clear_status_bar() {
   if (BrowserTestUtils.isVisible(status._progressBar)) {
     // Somehow the progress bar is still visible and probably in the
     // indeterminate state, meaning vsync timers are still active. Reset it.
-    status._stopMeteors();
+    MailServices.feedback.reportStatus("", "stop-meteors");
   }
 
   Assert.equal(
@@ -396,29 +398,35 @@ function subtest_config_results(template, configType) {
   );
 
   Assert.equal(
+    template.querySelector("#incomingPort").textContent,
+    configType === "pop" ? "995" : "993",
+    `${configType}: Incoming port should be as expected`
+  );
+
+  Assert.equal(
+    template.querySelector("#outgoingPort").textContent,
+    "465",
+    `${configType}: Outgoing port should be as expected`
+  );
+
+  Assert.equal(
     template.l10n.getAttributes(template.querySelector("#incomingSocketType"))
       .id,
-    "account-setup-result-ssl",
+    "account-hub-result-ssl",
     `${configType}: Incoming socketType should be as expected`
   );
 
   Assert.equal(
-    template.l10n.getAttributes(template.querySelector("#outgoingSocketType"))
+    template.l10n.getAttributes(template.querySelector("#authenticationType"))
       .id,
-    "account-setup-result-ssl",
-    `${configType}: Outgoing socketType should be as expected`
+    "account-hub-result-auth-password",
+    `${configType}: Authentication type should be expected`
   );
 
   Assert.equal(
     template.querySelector("#incomingUsername").textContent,
     "john.doe",
     `${configType}: Incoming username should be expected username`
-  );
-
-  Assert.equal(
-    template.querySelector("#outgoingUsername").textContent,
-    "john.doe",
-    `${configType}: Outgoing username should be expected username`
   );
 }
 
@@ -521,28 +529,7 @@ function removeAccountInternal(tab, account) {
 // cleanup function has had a chance to run. Instead, when it runs register
 // another cleanup function which will run last.
 registerCleanupFunction(function () {
-  registerCleanupFunction(async function () {
-    for (const server of MailServices.accounts.allServers) {
-      if (!["server1", "server2"].includes(server.key)) {
-        Assert.report(
-          true,
-          undefined,
-          undefined,
-          `Found server ${server.key} at the end of the test run`
-        );
-        MailServices.accounts.removeIncomingServer(server, false);
-      }
-    }
-    for (const account of MailServices.accounts.accounts) {
-      if (!["account1", "account2"].includes(account.key)) {
-        Assert.report(
-          true,
-          undefined,
-          undefined,
-          `Found account ${account.key} at the end of the test run`
-        );
-        MailServices.accounts.removeAccount(account, false);
-      }
-    }
+  registerCleanupFunction(function () {
+    removeServersAndAccounts();
   });
 });

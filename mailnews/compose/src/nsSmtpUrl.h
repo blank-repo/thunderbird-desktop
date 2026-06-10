@@ -1,4 +1,3 @@
-/* -*- Mode: C++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -6,22 +5,29 @@
 #ifndef COMM_MAILNEWS_COMPOSE_SRC_NSSMTPURL_H_
 #define COMM_MAILNEWS_COMPOSE_SRC_NSSMTPURL_H_
 
+#include "nsCOMPtr.h"
+#include "nsIAuthPrompt.h"
+#include "nsIInterfaceRequestor.h"
+#include "nsIIPCSerializableURI.h"
+#include "nsIMsgIdentity.h"
+#include "nsIMsgOutgoingServer.h"
+#include "nsIPrompt.h"
 #include "nsISmtpUrl.h"
 #include "nsIURI.h"
-#include "nsMsgMailNewsUrl.h"
-#include "nsIMsgIdentity.h"
-#include "nsCOMPtr.h"
-#include "nsIPrompt.h"
-#include "nsIAuthPrompt.h"
-#include "nsIMsgOutgoingServer.h"
-#include "nsIInterfaceRequestor.h"
 #include "nsIURIMutator.h"
+#include "nsIURIWithSizeOf.h"
+#include "nsMsgMailNewsUrl.h"
 
-class nsMailtoUrl : public nsIMailtoUrl, public nsIURI {
+class nsMailtoUrl : public nsIMailtoUrl,
+                    public nsIURI,
+                    public nsIIPCSerializableURI,
+                    public nsIURIWithSizeOf {
  public:
   NS_DECL_ISUPPORTS
-  NS_DECL_NSIURI
   NS_DECL_NSIMAILTOURL
+  NS_DECL_NSIURI
+  NS_DECL_NSIIPCSERIALIZABLEURI
+  NS_DECL_NSIURIWITHSIZEOF
 
   nsMailtoUrl();
   static nsresult NewMailtoURI(const nsACString& aSpec, nsIURI* aBaseURI,

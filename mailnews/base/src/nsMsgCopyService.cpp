@@ -1,4 +1,3 @@
-/* -*- Mode: C++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -8,6 +7,7 @@
 #include "nspr.h"
 #include "nsIFile.h"
 #include "nsIMsgFolderNotificationService.h"
+#include "nsIMsgTransactionService.h"
 #include "nsServiceManagerUtils.h"
 #include "nsMsgUtils.h"
 #include "mozilla/Components.h"
@@ -69,9 +69,12 @@ nsresult nsCopyRequest::Init(nsCopyRequestType type, nsISupports* aSupport,
   m_newMsgKeywords = newMsgKeywords;
 
   if (listener) m_listener = listener;
-  if (msgWindow) {
-    m_msgWindow = msgWindow;
-    if (m_allowUndo) msgWindow->GetTransactionManager(getter_AddRefs(m_txnMgr));
+  m_msgWindow = msgWindow;
+  if (m_allowUndo) {
+    nsCOMPtr<nsIMsgTransactionService> txns =
+        mozilla::components::Txns::Service();
+    NS_ENSURE_STATE(txns);
+    txns->GetTransactionManager(getter_AddRefs(m_txnMgr));
   }
   if (type == nsCopyFoldersType) {
     // To support multiple copy folder operations to the same destination, we
@@ -101,7 +104,6 @@ nsCopySource* nsCopyRequest::AddNewCopySource(nsIMsgFolder* srcFolder) {
 //
 
 nsMsgCopyService::nsMsgCopyService() {}
-
 nsMsgCopyService::~nsMsgCopyService() {
   int32_t i = m_copyRequests.Length();
 

@@ -20,6 +20,7 @@ const { OAuth2TestUtils } = ChromeUtils.importESModule(
 const { ServerTestUtils } = ChromeUtils.importESModule(
   "resource://testing-common/mailnews/ServerTestUtils.sys.mjs"
 );
+
 const { createServer, serverDefs } = ServerTestUtils;
 
 let oAuth2Server;
@@ -30,7 +31,7 @@ add_setup(async function () {
 });
 
 registerCleanupFunction(async function () {
-  Services.logins.removeAllLogins();
+  await Services.logins.removeAllLoginsAsync();
   // Some tests that open new windows confuse mochitest, which waits for a
   // focus event on the main window, and the test times out. If we focus a
   // different window (browser-harness.xhtml should be the only other window
@@ -39,7 +40,7 @@ registerCleanupFunction(async function () {
 });
 
 async function subtest(grantedScope, expectFailure) {
-  Services.logins.removeAllLogins();
+  await Services.logins.removeAllLoginsAsync();
   Services.fog.testResetFOG();
 
   const config = new AccountConfig();
@@ -70,9 +71,10 @@ async function subtest(grantedScope, expectFailure) {
   const verifier = new ConfigVerifier(window.msgWindow);
   const verifyPromise = verifier.verifyConfig(config);
 
-  // The telemetry isn't ready just yet, but we must handle `verifyPromise`
-  // before yielding the event loop to avoid it being recorded as unhandled.
-  // So wait for that to finish, the telemetry will be recorded by then.
+  // We must handle `verifyPromise` before yielding the event loop to avoid it
+  // being recorded as unhandled. On slow machines, the IMAP server can time
+  // out before the OAuth token exchange completes, so the telemetry may not
+  // be recorded by the time `verifyPromise` settles.
   if (expectFailure) {
     await Assert.rejects(
       verifyPromise,
@@ -83,15 +85,36 @@ async function subtest(grantedScope, expectFailure) {
     await verifyPromise;
   }
 
+  // Wait for the OAuth module to record telemetry, which signals that the
+  // token exchange has fully completed.
+  await TestUtils.waitForCondition(
+    () => Glean.mail.oauth2Authentication.testGetValue(),
+    "waiting for OAuth telemetry"
+  );
+
   OAuth2TestUtils.checkTelemetry([
     {
       issuer: "test.test",
       reason: "no refresh token",
       result: "succeeded",
+      where: "internal",
     },
   ]);
 
   if (expectFailure) {
+    // After verifyPromise settles, the OAuth module may still asynchronously
+    // save a refresh token. Wait for it to appear and clear it so the next
+    // test's initFromHostname spin doesn't pick it up.
+    await TestUtils.waitForCondition(
+      async () =>
+        (
+          await Services.logins.searchLoginsAsync({
+            origin: "oauth://test.test",
+          })
+        ).length > 0,
+      "waiting for refresh token to be saved"
+    ).catch(() => {});
+    await Services.logins.removeAllLoginsAsync();
     return;
   }
 
@@ -120,7 +143,7 @@ async function subtest(grantedScope, expectFailure) {
 
   MailServices.accounts.removeAccount(account, false);
   MailServices.outgoingServer.deleteServer(outgoingServer);
-  Services.logins.removeAllLogins();
+  await Services.logins.removeAllLoginsAsync();
 }
 
 async function expectOAuthDialog(grantedScope) {

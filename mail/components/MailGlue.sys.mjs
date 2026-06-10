@@ -1,4 +1,3 @@
-/* -*- Mode: JavaScript; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -392,6 +391,10 @@ MailGlue.prototype = {
     // Shut-down notifications.
     Services.obs.addObserver(this, "xpcom-shutdown");
 
+    // Tray Menu Items
+    Services.obs.addObserver(this, "system-tray-menu-hide");
+    Services.obs.addObserver(this, "system-tray-menu-show");
+
     // General notifications.
     Services.obs.addObserver(this, "intl:app-locales-changed");
     Services.obs.addObserver(this, "handle-xul-text-link");
@@ -422,6 +425,9 @@ MailGlue.prototype = {
     // mail-startup-done is removed by its handler.
 
     Services.obs.removeObserver(this, "xpcom-shutdown");
+
+    Services.obs.removeObserver(this, "system-tray-menu-hide");
+    Services.obs.removeObserver(this, "system-tray-menu-show");
 
     Services.obs.removeObserver(this, "intl:app-locales-changed");
     Services.obs.removeObserver(this, "handle-xul-text-link");
@@ -521,6 +527,12 @@ MailGlue.prototype = {
       case "xpcom-shutdown":
         this._dispose();
         break;
+      case "system-tray-menu-hide":
+         this._onHideRequest();
+         break;
+      case "system-tray-menu-show":
+        this._onShowRequest();
+        break;
       case "intl:app-locales-changed": {
         Cc["@mozilla.org/msgFolder/msgFolderService;1"]
           .getService(Ci.nsIMsgFolderService)
@@ -569,7 +581,7 @@ MailGlue.prototype = {
         ) {
           Services.scriptloader.loadSubScript(
             "chrome://messenger/content/customElements.js",
-            doc.ownerGlobal
+            doc.documentGlobal
           );
         }
         break;
@@ -942,8 +954,20 @@ MailGlue.prototype = {
             onUninstalled() {
               lazy.checkInstalledExtensions();
             },
+            onDisabled() {
+              lazy.checkInstalledExtensions();
+            },
+            onEnabled() {
+              lazy.checkInstalledExtensions();
+            },
           });
           await lazy.checkInstalledExtensions();
+          Services.prefs.addObserver(
+            "extensions.experiments.suppressed",
+            () => {
+              lazy.checkInstalledExtensions();
+            }
+          );
         },
       },
       {
@@ -1047,6 +1071,33 @@ MailGlue.prototype = {
         }
       });
     }
+  },
+
+  //tray menu item callback
+  _onHideRequest: function()
+  {
+   let enumerator = Services.wm.getEnumerator(null);
+
+   while (enumerator.hasMoreElements()) {
+      let win = enumerator.getNext();
+      let bw = win.docShell.treeOwner.QueryInterface(Ci.nsIBaseWindow);
+      bw.visibility = false;
+      /*console.log(`title=${win.document.title}`);*/
+   }
+  },
+
+
+  //tray menu item callback
+  _onShowRequest: function()
+  {
+   let enumerator = Services.wm.getEnumerator(null);
+
+   while (enumerator.hasMoreElements()) {
+      let win = enumerator.getNext();
+      let bw = win.docShell.treeOwner.QueryInterface(Ci.nsIBaseWindow);
+      bw.visibility = true;
+      /*console.log(`title=${win.document.title}`);*/
+   }
   },
 
   _handleLink(aSubject, aData) {
@@ -1367,7 +1418,6 @@ function reportPreferences() {
     "general.smoothScroll",
     "intl.regional_prefs.use_os_locales",
     "layers.acceleration.disabled",
-    "mail.accounthub.enabled",
     "mail.accounthub.addressbook.enabled",
     "mail.biff.play_sound",
     "mail.close_message_window.on_delete",
@@ -1386,6 +1436,8 @@ function reportPreferences() {
     "mailnews.database.global.indexer.enabled",
     "mailnews.mark_message_read.auto",
     "mailnews.mark_message_read.delay",
+    "mailnews.oauth.usePrivateBrowser",
+    "mailnews.oauth.useExternalBrowser",
     "mailnews.scroll_to_new_message",
     "mailnews.start_page.enabled",
     "privacy.clearOnShutdown.cache",
@@ -1498,7 +1550,7 @@ function reportPreferences() {
   ];
 
   // Platform-specific preferences
-  if (AppConstants.platform === "win") {
+  if (AppConstants.platform === "win" || AppConstants.platform === "linux") {
     booleanPrefs.push("mail.biff.show_tray_icon", "mail.minimizeToTray");
   }
 
@@ -1600,11 +1652,11 @@ function reportEwsAccounts() {
     return;
   }
 
-  // We typically don't reuse EWS clients when using them in e.g. `EwsFolder` or
-  // `EwsIncomingServer`, but the implementation of the *telemetry* method if
-  // `IEwsClient` is completely stateless, so client reuse is not an issue here.
+  // We typically don't reuse EWS clients when using them in e.g. `ExchangeFolder` or
+  // `ExchangeIncomingServer`, but the implementation of the *telemetry* method if
+  // `IExchangeClient` is completely stateless, so client reuse is not an issue here.
   const ewsClient = Cc["@mozilla.org/messenger/ews-client;1"].createInstance(
-    Ci.IEwsClient
+    Ci.IExchangeClient
   );
 
   for (const server of servers) {

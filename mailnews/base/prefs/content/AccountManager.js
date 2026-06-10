@@ -1,5 +1,4 @@
-/* -*- Mode: JavaScript; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 2 -*-
- * This Source Code Form is subject to the terms of the Mozilla Public
+/* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
@@ -80,13 +79,14 @@ ChromeUtils.defineLazyGetter(this, "gSubDialog", function () {
       styleSheets: [
         "chrome://messenger/skin/preferences/dialog.css",
         "chrome://messenger/skin/preferences/preferences.css",
+        "chrome://messenger/skin/variables.css",
       ],
       resizeCallback: ({ frame }) => {
         UIFontSize.registerWindow(frame.contentWindow);
 
         // Resize the dialog to fit the content with edited font size.
         requestAnimationFrame(() => {
-          const dialogs = frame.ownerGlobal.gSubDialog._dialogs;
+          const dialogs = frame.documentGlobal.gSubDialog._dialogs;
           const dialog = dialogs.find(
             d => d._frame.contentDocument == frame.contentDocument
           );
@@ -1017,7 +1017,7 @@ function saveAccount(accountValues, account) {
       } else if (type == "imap") {
         dest = server.QueryInterface(Ci.nsIImapIncomingServer);
       } else if (type == "ews") {
-        dest = server.QueryInterface(Ci.IEwsIncomingServer);
+        dest = server.QueryInterface(Ci.IExchangeIncomingServer);
       } else if (type == "none") {
         dest = server.QueryInterface(Ci.nsINoIncomingServer);
       } else if (type == "nntp") {
@@ -1380,7 +1380,7 @@ function getAccountValue(
       } else if (type == "imap") {
         source = server.QueryInterface(Ci.nsIImapIncomingServer);
       } else if (type == "ews") {
-        source = server.QueryInterface(Ci.IEwsIncomingServer);
+        source = server.QueryInterface(Ci.IExchangeIncomingServer);
       } else if (type == "none") {
         source = server.QueryInterface(Ci.nsINoIncomingServer);
       } else if (type == "nntp") {

@@ -106,12 +106,15 @@ add_task(async function test_account_oauth_imap_account() {
 
   await subtest_clear_status_bar();
   MailServices.accounts.removeAccount(imapAccount);
+  MailServices.outgoingServer.deleteServer(
+    MailServices.outgoingServer.servers.find(s => s.key != "smtp1")
+  );
 
   OAuth2TestUtils.stopServer();
   oauthImap.close();
   oauthSmtp.close();
   OAuth2TestUtils.forgetObjects();
-  Services.logins.removeAllLogins();
+  await Services.logins.removeAllLoginsAsync();
   await subtest_close_account_hub_dialog(dialog, successStep);
 });
 
@@ -186,6 +189,6 @@ add_task(async function test_account_oauth_cancel() {
   oauthImap.close();
   oauthSmtp.close();
   OAuth2TestUtils.forgetObjects();
-  Services.logins.removeAllLogins();
+  await Services.logins.removeAllLoginsAsync();
   await subtest_close_account_hub_dialog(dialog, configFoundTemplate);
 });

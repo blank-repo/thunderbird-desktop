@@ -52,16 +52,23 @@ export class IMAPServer {
   }
 
   /**
-   * @param {nsIMsgImapMailFolder} folder
-   * @param {SyntheticMessage[]} messages
+   * @param {nsIMsgImapMailFolder|string} folder - A folder object, or the
+   *   name of a mailbox.
+   * @param {SyntheticMessage[]} messages - Messages to add, usually from
+   *   MessageGenerator.
    * @param {boolean} [update=true] - Whether the client should update the
-   *   folder immediately
-   * @returns {Promise} - Resolves immediately if `update` is false, otherwise
-   *   resolves when `folder` has been updated
+   *   folder immediately.
+   * @returns {Promise} - Resolves immediately if `folder` is a string, or
+   *   `update` is false, otherwise resolves when `folder` has been updated.
    */
   addMessages(folder, messages, update = true) {
-    folder.QueryInterface(Ci.nsIMsgImapMailFolder);
-    const mailbox = this.daemon.getMailbox(folder.onlineName);
+    let mailbox;
+    if (typeof folder == "string") {
+      mailbox = this.daemon.getMailbox(folder);
+    } else {
+      folder.QueryInterface(Ci.nsIMsgImapMailFolder);
+      mailbox = this.daemon.getMailbox(folder.onlineName);
+    }
     messages.forEach(message => {
       if (typeof message != "string") {
         message = message.toMessageString();
@@ -75,7 +82,7 @@ export class IMAPServer {
       mailbox.addMessage(imapMsg);
     });
 
-    if (update) {
+    if (update && typeof folder == "object") {
       return new Promise(resolve =>
         mailTestUtils.updateFolderAndNotify(folder, resolve)
       );
@@ -105,10 +112,6 @@ export class GmailServer extends IMAPServer {
     this.daemon = new ImapDaemon();
     this.daemon.getMailbox("INBOX").specialUseFlag = "\\Inbox";
     this.daemon.getMailbox("INBOX").subscribed = true;
-    this.daemon.createMailbox("Trash", {
-      flags: ["\\Trash"],
-      subscribed: true,
-    });
     this.daemon.createMailbox("[Gmail]", {
       flags: ["\\NoSelect"],
       subscribed: true,
@@ -117,6 +120,22 @@ export class GmailServer extends IMAPServer {
       flags: ["\\Archive"],
       subscribed: true,
       specialUseFlag: "\\AllMail",
+    });
+    this.daemon.createMailbox("[Gmail]/Trash", {
+      flags: ["\\Trash"],
+      subscribed: true,
+    });
+    this.daemon.createMailbox("[Gmail]/Drafts", {
+      flags: ["\\Drafts"],
+      subscribed: true,
+    });
+    this.daemon.createMailbox("[Gmail]/Sent Mail", {
+      flags: ["\\Sent"],
+      subscribed: true,
+    });
+    this.daemon.createMailbox("[Gmail]/Spam", {
+      flags: ["\\Spam"],
+      subscribed: true,
     });
     super.open(["GMAIL", "RFC2197", "RFC2342", "RFC3348", "RFC4315"]);
   }

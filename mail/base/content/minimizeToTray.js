@@ -6,14 +6,13 @@
 
 addEventListener("sizemodechange", () => {
   if (
-    windowState == window.STATE_MINIMIZED &&
+    //windowState == window.STATE_MINIMIZED &&
     Services.prefs.getBoolPref("mail.minimizeToTray", false)
   ) {
     setTimeout(() => {
       var bw = docShell.treeOwner.QueryInterface(Ci.nsIBaseWindow);
-      Cc["@mozilla.org/messenger/osintegration;1"]
-        .getService(Ci.nsIMessengerWindowsIntegration)
-        .hideWindow(bw);
+      bw.visibility = windowState != window.STATE_MINIMIZED;
+      //Cc["@mozilla.org/messenger/osintegration;1"].getService(Ci.nsIMessengerWindowsIntegration).hideWindow(bw);
     });
   }
 });
